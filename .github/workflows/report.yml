@@ -1,4 +1,4 @@
-name: Workflow 1 - Verificador
+name: Workflow 2 - Verificar Wrapper
 
 on:
   workflow_dispatch:
@@ -8,31 +8,21 @@ on:
       - master
 
 jobs:
-  verificar-estrutura:
+  verificar-wrapper:
     runs-on: ubuntu-latest
 
     steps:
       - name: Baixar repositório
         uses: actions/checkout@v4
 
-      - name: Mostrar pasta raiz
-        run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          echo "Nome da pasta: $(basename "$GITHUB_WORKSPACE")"
-
-      - name: Verificar estrutura do projeto
+      - name: Verificar arquivos do wrapper
         shell: bash
         run: |
-          set +e
-
-          REPORT="report-verificador.txt"
+          REPORT="report-wrapper.txt"
           : > "$REPORT"
 
-          echo "RELATORIO DO PROJETO" >> "$REPORT"
+          echo "RELATORIO DO WRAPPER" >> "$REPORT"
           echo "====================" >> "$REPORT"
-          echo "" >> "$REPORT"
-          echo "Pasta raiz: $(basename "$GITHUB_WORKSPACE")" >> "$REPORT"
-          echo "Caminho: $GITHUB_WORKSPACE" >> "$REPORT"
           echo "" >> "$REPORT"
 
           check_file() {
@@ -44,47 +34,28 @@ jobs:
             fi
           }
 
-          check_dir() {
-            local dir="$1"
-            if [ -d "$dir" ]; then
-              echo "[OK] $dir" >> "$REPORT"
+          check_exec() {
+            local file="$1"
+            if [ -f "$file" ] && [ -x "$file" ]; then
+              echo "[OK] executavel: $file" >> "$REPORT"
+            elif [ -f "$file" ]; then
+              echo "[FALTA PERMISSAO] $file" >> "$REPORT"
             else
-              echo "[FALTA] $dir" >> "$REPORT"
+              echo "[FALTA] $file" >> "$REPORT"
             fi
           }
 
-          echo "ARQUIVOS PRINCIPAIS" >> "$REPORT"
-          echo "-------------------" >> "$REPORT"
-          check_file "settings.gradle.kts"
-          check_file "build.gradle.kts"
-          check_file "gradle.properties"
-          check_dir "gradle/wrapper"
           check_file "gradle/wrapper/gradle-wrapper.properties"
           check_file "gradle/wrapper/gradle-wrapper.jar"
-          echo "" >> "$REPORT"
+          check_exec "gradlew"
+          check_file "gradlew.bat"
 
-          echo "MODULO APP" >> "$REPORT"
-          echo "----------" >> "$REPORT"
-          check_dir "app"
-          check_file "app/build.gradle.kts"
-          check_file "app/src/main/AndroidManifest.xml"
-          check_dir "app/src/main/java"
-          check_dir "app/src/main/res"
           echo "" >> "$REPORT"
-
-          echo "ARQUIVOS XML COMUNS" >> "$REPORT"
-          echo "-------------------" >> "$REPORT"
-          find app/src/main/res -type f 2>/dev/null | sort >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          echo "ARQUIVOS KOTLIN ENCONTRADOS" >> "$REPORT"
-          echo "---------------------------" >> "$REPORT"
-          find app/src/main/java -type f -name "*.kt" 2>/dev/null | sort >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          echo "ESTRUTURA RESUMIDA" >> "$REPORT"
-          echo "------------------" >> "$REPORT"
-          find . -maxdepth 3 | sort >> "$REPORT"
+          echo "CONTEUDO DO gradle-wrapper.properties" >> "$REPORT"
+          echo "-------------------------------------" >> "$REPORT"
+          if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
+            cat gradle/wrapper/gradle-wrapper.properties >> "$REPORT"
+          fi
 
           echo "" >> "$REPORT"
           echo "FIM DO RELATORIO" >> "$REPORT"
@@ -94,16 +65,15 @@ jobs:
       - name: Resumo do job
         run: |
           {
-            echo "### Verificador concluido"
+            echo "### Verificacao do wrapper concluida"
             echo ""
-            echo "- Pasta raiz: \`$(basename "$GITHUB_WORKSPACE")\`"
-            echo "- Relatorio gerado: \`report-verificador.txt\`"
-            echo "- Objetivo: checar estrutura antes do build"
+            echo "- Arquivo de saida: \`report-wrapper.txt\`"
+            echo "- O objetivo e confirmar se o Gradle pode rodar no GitHub Actions"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload do relatorio
         uses: actions/upload-artifact@v4
         with:
-          name: relatorio-verificador
-          path: report-verificador.txt
-          
+          name: relatorio-wrapper
+          path: report-wrapper.txt
+  
