@@ -1,4 +1,4 @@
-name: Reporte da Pasta
+name: Workflow 1 - Verificador
 
 on:
   workflow_dispatch:
@@ -8,51 +8,102 @@ on:
       - master
 
 jobs:
-  report:
+  verificar-estrutura:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar o repositório
+      - name: Baixar repositório
         uses: actions/checkout@v4
 
-      - name: Mostrar nome da pasta
+      - name: Mostrar pasta raiz
         run: |
-          echo "Nome da pasta do workspace:"
-          echo "$(basename "$GITHUB_WORKSPACE")"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Nome da pasta: $(basename "$GITHUB_WORKSPACE")"
 
-      - name: Gerar relatório
+      - name: Verificar estrutura do projeto
+        shell: bash
         run: |
-          {
-            echo "# Relatório do Projeto"
-            echo ""
-            echo "## Pasta raiz"
-            echo "$(basename "$GITHUB_WORKSPACE")"
-            echo ""
-            echo "## Caminho completo"
-            echo "$GITHUB_WORKSPACE"
-            echo ""
-            echo "## Arquivos e pastas no nível principal"
-            ls -la
-            echo ""
-            echo "## Estrutura resumida"
-            find . -maxdepth 2 | sort
-          } > report.txt
+          set +e
 
-      - name: Mostrar relatório no log
-        run: cat report.txt
+          REPORT="report-verificador.txt"
+          : > "$REPORT"
+
+          echo "RELATORIO DO PROJETO" >> "$REPORT"
+          echo "====================" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "Pasta raiz: $(basename "$GITHUB_WORKSPACE")" >> "$REPORT"
+          echo "Caminho: $GITHUB_WORKSPACE" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          check_file() {
+            local file="$1"
+            if [ -f "$file" ]; then
+              echo "[OK] $file" >> "$REPORT"
+            else
+              echo "[FALTA] $file" >> "$REPORT"
+            fi
+          }
+
+          check_dir() {
+            local dir="$1"
+            if [ -d "$dir" ]; then
+              echo "[OK] $dir" >> "$REPORT"
+            else
+              echo "[FALTA] $dir" >> "$REPORT"
+            fi
+          }
+
+          echo "ARQUIVOS PRINCIPAIS" >> "$REPORT"
+          echo "-------------------" >> "$REPORT"
+          check_file "settings.gradle.kts"
+          check_file "build.gradle.kts"
+          check_file "gradle.properties"
+          check_dir "gradle/wrapper"
+          check_file "gradle/wrapper/gradle-wrapper.properties"
+          check_file "gradle/wrapper/gradle-wrapper.jar"
+          echo "" >> "$REPORT"
+
+          echo "MODULO APP" >> "$REPORT"
+          echo "----------" >> "$REPORT"
+          check_dir "app"
+          check_file "app/build.gradle.kts"
+          check_file "app/src/main/AndroidManifest.xml"
+          check_dir "app/src/main/java"
+          check_dir "app/src/main/res"
+          echo "" >> "$REPORT"
+
+          echo "ARQUIVOS XML COMUNS" >> "$REPORT"
+          echo "-------------------" >> "$REPORT"
+          find app/src/main/res -type f 2>/dev/null | sort >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          echo "ARQUIVOS KOTLIN ENCONTRADOS" >> "$REPORT"
+          echo "---------------------------" >> "$REPORT"
+          find app/src/main/java -type f -name "*.kt" 2>/dev/null | sort >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          echo "ESTRUTURA RESUMIDA" >> "$REPORT"
+          echo "------------------" >> "$REPORT"
+          find . -maxdepth 3 | sort >> "$REPORT"
+
+          echo "" >> "$REPORT"
+          echo "FIM DO RELATORIO" >> "$REPORT"
+
+          cat "$REPORT"
 
       - name: Resumo do job
         run: |
           {
-            echo "### Relatório gerado"
+            echo "### Verificador concluido"
             echo ""
-            echo "- Pasta: \`$(basename "$GITHUB_WORKSPACE")\`"
-            echo "- Caminho: \`$GITHUB_WORKSPACE\`"
-            echo "- Relatório salvo em: \`report.txt\`"
+            echo "- Pasta raiz: \`$(basename "$GITHUB_WORKSPACE")\`"
+            echo "- Relatorio gerado: \`report-verificador.txt\`"
+            echo "- Objetivo: checar estrutura antes do build"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Enviar relatório como artefato
+      - name: Upload do relatorio
         uses: actions/upload-artifact@v4
         with:
-          name: report-pasta
-          path: report.txt
+          name: relatorio-verificador
+          path: report-verificador.txt
+          
