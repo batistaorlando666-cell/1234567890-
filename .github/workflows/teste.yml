@@ -1,12 +1,66 @@
-
+name: Android CI Automatizado com Relatórios
 
 on:
-  workflow_dispatch:
+  # Liga no automático para cada 'push' (envio de código)
+  push:
+    branches: [ "main", "master" ]
+  # Liga no automático quando alguém tenta juntar código novo (Pull Request)
+  pull_request:
+    branches: [ "main", "master" ]
+  # Mantém o botão manual caso você queira forçar a execução
+  workflow_dispatch: 
 
 jobs:
-  teste:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ola
-        run: echo "FUNCIONOU"
+    - name: Clonar o Repositório
+      uses: actions/checkout@v4
+
+    - name: Configurar o JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Configurar o Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Dar permissão de execução para o gradlew
+      run: chmod +x gradlew
+
+    # 1. Avaliar Erros de Código (Lint)
+    - name: Verificar erros e qualidade do código (Lint)
+      run: ./gradlew lintDebug
+
+    # 2. Rodar os Testes (Verificar Módulos)
+    - name: Rodar testes unitários
+      run: ./gradlew testDebugUnitTest
+
+    # 3. Gerar o APK
+    - name: Gerar o APK Debug
+      run: ./gradlew assembleDebug
+
+    # 4. Salvar Relatório de Erros (Lint)
+    - name: Disponibilizar Relatório do Lint
+      uses: actions/upload-artifact@v4
+      if: always() # Garante que o relatório seja gerado mesmo se encontrar erros
+      with:
+        name: relatorio-lint
+        path: app/build/reports/lint-results-debug.html
+
+    # 5. Salvar Relatório de Testes
+    - name: Disponibilizar Relatório de Testes
+      uses: actions/upload-artifact@v4
+      if: always() # Garante que o relatório de testes seja salvo caso algum teste falhe
+      with:
+        name: relatorio-testes
+        path: app/build/reports/tests/testDebugUnitTest/
+
+    # 6. Salvar o APK gerado
+    - name: Disponibilizar APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
