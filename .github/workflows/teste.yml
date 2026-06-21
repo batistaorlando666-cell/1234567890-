@@ -1,4 +1,4 @@
-name: Gerar APK Direto
+name: Gerar APK com Auto-Correção
 
 on:
   push:
@@ -22,14 +22,18 @@ jobs:
     - name: Configurar o Gradle
       uses: gradle/actions/setup-gradle@v4
 
+    # PASSO CHAVE: Recria a pasta gradle/wrapper e o arquivo gradle-wrapper.jar ausente
+    - name: Recriar o Gradle Wrapper ausente
+      run: gradle wrapper --gradle-version 8.13
+
     - name: Dar permissão de execução para o gradlew
       run: chmod +x gradlew
 
-    # Vamos tentar compilar diretamente o APK
+    # Agora o comando vai rodar sem o erro de "Missing gradle-wrapper.jar"
     - name: Gerar o APK Debug
       run: ./gradlew assembleDebug
 
-    # Se a linha acima funcionar, este passo vai guardar o seu APK
+    # Salva o arquivo APK para você baixar na aba Actions
     - name: Disponibilizar APK
       uses: actions/upload-artifact@v4
       with:
