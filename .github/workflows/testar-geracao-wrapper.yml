@@ -1,111 +1,20 @@
-name: Testar Geracao do Wrapper
-
-on:
-  workflow_dispatch:
-
-jobs:
-  testar-wrapper:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Baixar repositório
-        uses: actions/checkout@v4
-
-      - name: Instalar Gradle do sistema
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gradle tree
-
-      - name: Mostrar estado inicial
-        shell: bash
-        run: |
-          echo "=== RAIZ ==="
-          ls -la
-          echo
-          echo "=== gradle/wrapper ==="
-          find gradle -maxdepth 3 -type f 2>/dev/null || true
-
-      - name: Tentar gerar wrapper
-        shell: bash
-        run: |
-          set +e
-          REPORT="wrapper-geracao-relatorio.txt"
-          : > "$REPORT"
-
-          echo "RELATORIO DE GERACAO DO WRAPPER" >> "$REPORT"
-          echo "================================" >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          echo "Executando: gradle wrapper --gradle-version 8.13 --distribution-type bin" >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          gradle wrapper --gradle-version 8.13 --distribution-type bin >> "$REPORT" 2>&1
-          EXIT_CODE=$?
-
-          echo "" >> "$REPORT"
-          echo "Codigo de saida: $EXIT_CODE" >> "$REPORT"
-          echo "" >> "$REPORT"
-
-          echo "Arquivos apos tentativa:" >> "$REPORT"
-          ls -la >> "$REPORT" 2>&1
-          echo "" >> "$REPORT"
-          find gradle -maxdepth 3 -type f >> "$REPORT" 2>&1 || true
-
-          if [ -f "gradlew" ]; then
-            echo "[OK] gradlew criado" >> "$REPORT"
-          else
-            echo "[FALTA] gradlew" >> "$REPORT"
-          fi
-
-          if [ -f "gradlew.bat" ]; then
-            echo "[OK] gradlew.bat criado" >> "$REPORT"
-          else
-            echo "[FALTA] gradlew.bat" >> "$REPORT"
-          fi
-
-          if [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "[OK] gradle-wrapper.jar criado" >> "$REPORT"
-          else
-            echo "[FALTA] gradle-wrapper.jar" >> "$REPORT"
-          fi
-
-          if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-            echo "[OK] gradle-wrapper.properties presente" >> "$REPORT"
-          else
-            echo "[FALTA] gradle-wrapper.properties" >> "$REPORT"
-          fi
-
-          cat "$REPORT"
-
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            echo "Falha ao gerar wrapper, mas o relatorio foi criado."
-          fi
-
-      - name: Resumo do job
-        run: |
-          {
-            echo "### Teste de geracao do wrapper"
-            echo ""
-            echo "- Relatorio: \`wrapper-geracao-relatorio.txt\`"
-            echo "- Objetivo: verificar se o GitHub Actions consegue gerar os arquivos faltantes"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload do relatorio
-        uses: actions/upload-artifact@v4
-        with:
-          name: wrapper-geracao-relatorio
-          path: wrapper-geracao-relatorio.txt
-          if-no-files-found: ignore
-
-      - name: Upload dos arquivos gerados
-        uses: actions/upload-artifact@v4
-        with:
-          name: wrapper-gerado
-          path: |
-            gradlew
-            gradlew.bat
-            gradle/wrapper/gradle-wrapper.jar
-            gradle/wrapper/gradle-wrapper.properties
-          if-no-files-found: ignore
+            - name: Cache
+  uses: actions/cache@v5.0.5
+  with:
+    # A list of files, directories, and wildcard patterns to cache and restore
+    path: 
+    # An explicit key for restoring and saving the cache
+    key: 
+    # An ordered multiline string listing the prefix-matched keys, that are used for restoring stale cache if no cache hit occurred for key. Note `cache-hit` returns false in this case.
+    restore-keys: # optional
+    # The chunk size used to split up large files during upload, in bytes
+    upload-chunk-size: # optional
+    # An optional boolean when enabled, allows windows runners to save or restore caches that can be restored or saved respectively on other platforms
+    enableCrossOsArchive: # optional, default is false
+    # Fail the workflow if cache entry is not found
+    fail-on-cache-miss: # optional, default is false
+    # Check if a cache entry exists for the given input(s) (key, restore-keys) without downloading the cache
+    lookup-only: # optional, default is false
+    # Run the post step to save the cache even if another step before fails
+    save-always: # optional, default is false
+          
