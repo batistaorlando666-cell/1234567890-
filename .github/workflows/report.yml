@@ -1,410 +1,111 @@
- name: Super Verificador + Wrapper + Build
+name: Testar Geracao do Wrapper
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
 
 jobs:
-  diagnostico-e-build:
+  testar-wrapper:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-
-    env:
-      WRAPPER_VERSION: "8.13"
-      REPORT_DIR: "reports"
-      REPORT_FILE: "reports/super-relatorio.md"
-      BUILD_LOG: "reports/build.log"
+    timeout-minutes: 20
 
     steps:
       - name: Baixar repositório
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Instalar ferramentas do sistema
+      - name: Instalar Gradle do sistema
         shell: bash
         run: |
-          set -e
           sudo apt-get update
           sudo apt-get install -y gradle tree
 
-      - name: Informações do ambiente
+      - name: Mostrar estado inicial
         shell: bash
         run: |
-          set -e
-          echo "=== SISTEMA ==="
-          uname -a
-          echo
-          echo "=== JAVA ==="
-          java -version
-          echo
-          echo "=== GRADLE ==="
-          gradle -v
-          echo
-          echo "=== RAIZ DO REPOSITORIO ==="
-          pwd
+          echo "=== RAIZ ==="
           ls -la
-
-      - name: Gerar wrapper automaticamente se faltar
-        shell: bash
-        run: |
-          set -e
-          if [ ! -f "gradlew" ] || [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Wrapper incompleto. Tentando gerar com Gradle do sistema..."
-            gradle wrapper --gradle-version "${WRAPPER_VERSION}" --distribution-type bin
-          fi
-
-          chmod +x gradlew || true
-
           echo
-          echo "=== ARQUIVOS DO WRAPPER ==="
-          ls -la gradlew gradlew.bat gradle/wrapper || true
+          echo "=== gradle/wrapper ==="
+          find gradle -maxdepth 3 -type f 2>/dev/null || true
 
-      - name: Validar wrapper
-        shell: bash
-        run: |
-          set -e
-          ./gradlew --version
-
-      - name: Gerar super relatório estático
+      - name: Tentar gerar wrapper
         shell: bash
         run: |
           set +e
-          mkdir -p "${REPORT_DIR}"
+          REPORT="wrapper-geracao-relatorio.txt"
+          : > "$REPORT"
 
-          REPORT="${REPORT_FILE}"
-          : > "${REPORT}"
+          echo "RELATORIO DE GERACAO DO WRAPPER" >> "$REPORT"
+          echo "================================" >> "$REPORT"
+          echo "" >> "$REPORT"
 
-          section() {
-            echo
-            echo "## $1"
-            echo
-          }
+          echo "Executando: gradle wrapper --gradle-version 8.13 --distribution-type bin" >> "$REPORT"
+          echo "" >> "$REPORT"
 
-          ok() {
-            echo "- ✅ $1"
-          }
+          gradle wrapper --gradle-version 8.13 --distribution-type bin >> "$REPORT" 2>&1
+          EXIT_CODE=$?
 
-          warn() {
-            echo "- ⚠️ $1"
-          }
+          echo "" >> "$REPORT"
+          echo "Codigo de saida: $EXIT_CODE" >> "$REPORT"
+          echo "" >> "$REPORT"
 
-          fail() {
-            echo "- ❌ $1"
-          }
+          echo "Arquivos apos tentativa:" >> "$REPORT"
+          ls -la >> "$REPORT" 2>&1
+          echo "" >> "$REPORT"
+          find gradle -maxdepth 3 -type f >> "$REPORT" 2>&1 || true
 
-          check_file() {
-            local file="$1"
-            local label="$2"
-            if [ -f "$file" ]; then
-              ok "$label: encontrado ($file)"
-            else
-              fail "$label: ausente ($file)"
-            fi
-          }
+          if [ -f "gradlew" ]; then
+            echo "[OK] gradlew criado" >> "$REPORT"
+          else
+            echo "[FALTA] gradlew" >> "$REPORT"
+          fi
 
-          check_dir() {
-            local dir="$1"
-            local label="$2"
-            if [ -d "$dir" ]; then
-              ok "$label: encontrado ($dir)"
-            else
-              fail "$label: ausente ($dir)"
-            fi
-          }
+          if [ -f "gradlew.bat" ]; then
+            echo "[OK] gradlew.bat criado" >> "$REPORT"
+          else
+            echo "[FALTA] gradlew.bat" >> "$REPORT"
+          fi
 
-          check_grep() {
-            local pattern="$1"
-            local file="$2"
-            local label="$3"
-            if [ -f "$file" ] && grep -qE "$pattern" "$file"; then
-              ok "$label"
-            else
-              warn "$label"
-            fi
-          }
+          if [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "[OK] gradle-wrapper.jar criado" >> "$REPORT"
+          else
+            echo "[FALTA] gradle-wrapper.jar" >> "$REPORT"
+          fi
 
-          {
-            echo "# Super Relatório V1"
-            echo
-            echo "- Data UTC: $(date -u '+%Y-%m-%d %H:%M:%S')"
-            echo "- Workspace: $GITHUB_WORKSPACE"
-            echo "- Pasta raiz: $(basename "$GITHUB_WORKSPACE")"
-            echo
-          } >> "$REPORT"
-
-          section "1) Ambiente"
-          {
-            echo "- Sistema: $(uname -a)"
-            echo "- Java:"
-            java -version 2>&1 | sed 's/^/  /'
-            echo "- Gradle:"
-            gradle -v 2>&1 | sed 's/^/  /'
-          } >> "$REPORT"
-
-          section "2) Estrutura principal do repositório"
-          {
-            echo "### Raiz"
-            echo
-            find . -maxdepth 3 | sort
-          } >> "$REPORT"
-
-          section "3) Arquivos críticos do projeto"
-          {
-            check_file "settings.gradle.kts" "settings.gradle.kts"
-            check_file "build.gradle.kts" "build.gradle.kts raiz"
-            check_file "gradle.properties" "gradle.properties"
-            check_file "app/build.gradle.kts" "app/build.gradle.kts"
-            check_file "app/src/main/AndroidManifest.xml" "AndroidManifest.xml"
-            check_dir  "app/src/main/java" "Diretório Java/Kotlin"
-            check_dir  "app/src/main/res" "Diretório resources"
-          } >> "$REPORT"
-
-          section "4) Wrapper do Gradle"
-          {
-            check_file "gradlew" "gradlew"
-            check_file "gradlew.bat" "gradlew.bat"
-            check_file "gradle/wrapper/gradle-wrapper.properties" "gradle-wrapper.properties"
-            check_file "gradle/wrapper/gradle-wrapper.jar" "gradle-wrapper.jar"
-            echo
-            echo "### Conteúdo do gradle-wrapper.properties"
-            echo
-            if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-              cat gradle/wrapper/gradle-wrapper.properties
-            fi
-          } >> "$REPORT"
-
-          section "5) Estrutura do módulo app"
-          {
-            echo "### Kotlin encontrados"
-            find app/src/main/java -type f -name "*.kt" 2>/dev/null | sort || true
-            echo
-            echo "### XML encontrados"
-            find app/src/main/res -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" \) 2>/dev/null | sort || true
-          } >> "$REPORT"
-
-          section "6) Checklist dos módulos esperados"
-          {
-            expected_kt=(
-              "MainActivity.kt"
-              "ConfigManager.kt"
-              "CaptureService.kt"
-              "ScreenCaptureManager.kt"
-              "ImageProcessor.kt"
-              "NetworkManager.kt"
-              "AppLogger.kt"
-            )
-
-            for name in "${expected_kt[@]}"; do
-              if find app/src/main/java -type f -name "$name" | grep -q .; then
-                ok "Módulo Kotlin encontrado: $name"
-              else
-                fail "Módulo Kotlin ausente: $name"
-              fi
-            done
-          } >> "$REPORT"
-
-          section "7) Checklist do AndroidManifest"
-          {
-            MANIFEST="app/src/main/AndroidManifest.xml"
-
-            check_grep "android.permission.INTERNET" "$MANIFEST" "Permissão INTERNET"
-            check_grep "android.permission.FOREGROUND_SERVICE" "$MANIFEST" "Permissão FOREGROUND_SERVICE"
-            check_grep "android.permission.POST_NOTIFICATIONS" "$MANIFEST" "Permissão POST_NOTIFICATIONS"
-            check_grep "android.permission.WAKE_LOCK" "$MANIFEST" "Permissão WAKE_LOCK"
-            check_grep "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" "$MANIFEST" "Permissão FOREGROUND_SERVICE_MEDIA_PROJECTION"
-            check_grep "foregroundServiceType=.*mediaProjection" "$MANIFEST" "Foreground service type mediaProjection"
-            check_grep "android:exported=" "$MANIFEST" "Atributo android:exported"
-            check_grep "android:usesCleartextTraffic=\"true\"" "$MANIFEST" "Cleartext permitido (se usar HTTP)"
-          } >> "$REPORT"
-
-          section "8) Checklist de dependências do build.gradle.kts do app"
-          {
-            APP_GRADLE="app/build.gradle.kts"
-
-            check_grep "androidx\\.core:core-ktx" "$APP_GRADLE" "androidx.core:core-ktx"
-            check_grep "androidx\\.appcompat:appcompat" "$APP_GRADLE" "androidx.appcompat:appcompat"
-            check_grep "com\\.google\\.android\\.material:material" "$APP_GRADLE" "Material Components"
-            check_grep "androidx\\.lifecycle:lifecycle-runtime-ktx" "$APP_GRADLE" "Lifecycle runtime"
-            check_grep "androidx\\.lifecycle:lifecycle-service" "$APP_GRADLE" "Lifecycle service"
-            check_grep "org\\.jetbrains\\.kotlinx:kotlinx-coroutines-android" "$APP_GRADLE" "Coroutines Android"
-            check_grep "com\\.squareup\\.okhttp3:okhttp" "$APP_GRADLE" "OkHttp"
-            check_grep "com\\.squareup\\.okhttp3:logging-interceptor" "$APP_GRADLE" "OkHttp logging-interceptor"
-            check_grep "compileSdk\\s*=\\s*35|compileSdk\\s*=\\s*34|compileSdk\\s*=\\s*33" "$APP_GRADLE" "compileSdk definido"
-            check_grep "minSdk\\s*=\\s*26" "$APP_GRADLE" "minSdk 26"
-          } >> "$REPORT"
-
-          section "9) Sinais de comunicação entre módulos"
-          {
-            SRC_DIR="app/src/main/java"
-
-            if grep -RIn "ConfigManager" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "MainActivity/ConfigManager ou outro módulo cita ConfigManager"
-            else
-              warn "Nenhuma referência encontrada para ConfigManager"
-            fi
-
-            if grep -RIn "CaptureService" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "Existe referência a CaptureService"
-            else
-              warn "Nenhuma referência encontrada para CaptureService"
-            fi
-
-            if grep -RIn "ScreenCaptureManager" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "Existe referência a ScreenCaptureManager"
-            else
-              warn "Nenhuma referência encontrada para ScreenCaptureManager"
-            fi
-
-            if grep -RIn "ImageProcessor" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "Existe referência a ImageProcessor"
-            else
-              warn "Nenhuma referência encontrada para ImageProcessor"
-            fi
-
-            if grep -RIn "NetworkManager" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "Existe referência a NetworkManager"
-            else
-              warn "Nenhuma referência encontrada para NetworkManager"
-            fi
-
-            if grep -RIn "AppLogger" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-              ok "Existe referência a AppLogger"
-            else
-              warn "Nenhuma referência encontrada para AppLogger"
-            fi
-          } >> "$REPORT"
-
-          section "10) Checagem de padrões críticos"
-          {
-            SRC_DIR="app/src/main/java"
-
-            check_pattern() {
-              local pattern="$1"
-              local label="$2"
-              if grep -RIn "$pattern" "$SRC_DIR" 2>/dev/null | head -n 1 >/dev/null; then
-                ok "$label"
-              else
-                warn "$label"
-              fi
-            }
-
-            check_pattern "MediaProjectionManager" "Uso de MediaProjectionManager"
-            check_pattern "ImageReader" "Uso de ImageReader"
-            check_pattern "VirtualDisplay" "Uso de VirtualDisplay"
-            check_pattern "startForeground" "Uso de startForeground"
-            check_pattern "OkHttpClient" "Uso de OkHttpClient"
-            check_pattern "enqueue(" "Uso de envio assíncrono enqueue"
-            check_pattern "SharedPreferences" "Uso de SharedPreferences"
-            check_pattern "Coroutine" "Presença de Coroutines"
-            check_pattern "delay(" "Uso de delay"
-            check_pattern "Handler" "Uso de Handler"
-          } >> "$REPORT"
-
-          section "11) Checklist HTTP/HTTPS"
-          {
-            if grep -RIn "http://" app/src/main/java app/src/main/res app/src/main/AndroidManifest.xml 2>/dev/null | head -n 1 >/dev/null; then
-              warn "URL HTTP encontrada no código. Se usar HTTP real, o Manifest precisa permitir cleartext."
-            else
-              ok "Nenhuma URL HTTP detectada nos arquivos escaneados."
-            fi
-          } >> "$REPORT"
-
-          section "12) Resumo visual da árvore do projeto"
-          {
-            echo '```'
-            tree -a -L 4 2>/dev/null || find . -maxdepth 4 | sort
-            echo '```'
-          } >> "$REPORT"
-
-          section "13) Observação técnica"
-          {
-            echo "- Este relatório valida estrutura, sinais de comunicação e dependências."
-            echo "- Ele não prova estabilidade de 24h no celular."
-            echo "- Ele também não prova que o usuário já abriu o jogo certo."
-            echo "- Para confirmar comportamento real no aparelho, ainda será necessário teste no Android."
-          } >> "$REPORT"
+          if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
+            echo "[OK] gradle-wrapper.properties presente" >> "$REPORT"
+          else
+            echo "[FALTA] gradle-wrapper.properties" >> "$REPORT"
+          fi
 
           cat "$REPORT"
 
-      - name: Registrar resumo no GitHub Actions
-        shell: bash
-        run: |
-          {
-            echo "### Super verificador concluído"
-            echo ""
-            echo "- Relatório: \`reports/super-relatorio.md\`"
-            echo "- Build log: \`reports/build.log\`"
-            echo "- Wrapper: verificado ou gerado automaticamente"
-            echo "- APK: tentativa será feita na próxima etapa"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Tentar compilar APK de debug
-        shell: bash
-        run: |
-          set +e
-          chmod +x gradlew
-
-          ./gradlew :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee "${BUILD_LOG}"
-          BUILD_EXIT=${PIPESTATUS[0]}
-
-          echo
-          echo "======================"
-          echo "EXIT CODE: ${BUILD_EXIT}"
-          echo "======================"
-          echo
-
-          if [ "${BUILD_EXIT}" -eq 0 ]; then
-            echo "BUILD_OK=true" >> "$GITHUB_ENV"
-          else
-            echo "BUILD_OK=false" >> "$GITHUB_ENV"
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "Falha ao gerar wrapper, mas o relatorio foi criado."
           fi
 
-          {
-            echo
-            echo "## Resultado do build"
-            echo
-            if [ "${BUILD_EXIT}" -eq 0 ]; then
-              echo "- ✅ assembleDebug concluiu com sucesso."
-            else
-              echo "- ❌ assembleDebug falhou."
-            fi
-            echo "- Código de saída: ${BUILD_EXIT}"
-          } >> "${REPORT_FILE}"
-
-      - name: Verificar APK gerado
-        shell: bash
-        run: |
-          set +e
-          if ls app/build/outputs/apk/debug/*.apk >/dev/null 2>&1; then
-            echo "APK_DEBUG=true" >> "$GITHUB_ENV"
-            echo "- ✅ APK encontrado." >> "${REPORT_FILE}"
-            ls -la app/build/outputs/apk/debug/ >> "${REPORT_FILE}"
-          else
-            echo "APK_DEBUG=false" >> "$GITHUB_ENV"
-            echo "- ⚠️ Nenhum APK debug encontrado." >> "${REPORT_FILE}"
-          fi
-
-      - name: Atualizar resumo final
-        shell: bash
+      - name: Resumo do job
         run: |
           {
-            echo "### Resultado final"
+            echo "### Teste de geracao do wrapper"
             echo ""
-            echo "- Build ok: \`${BUILD_OK:-false}\`"
-            echo "- APK debug gerado: \`${APK_DEBUG:-false}\`"
-            echo "- Relatório final: \`reports/super-relatorio.md\`"
+            echo "- Relatorio: \`wrapper-geracao-relatorio.txt\`"
+            echo "- Objetivo: verificar se o GitHub Actions consegue gerar os arquivos faltantes"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload dos artefatos
+      - name: Upload do relatorio
         uses: actions/upload-artifact@v4
         with:
-          name: super-relatorio-e-build
+          name: wrapper-geracao-relatorio
+          path: wrapper-geracao-relatorio.txt
+          if-no-files-found: ignore
+
+      - name: Upload dos arquivos gerados
+        uses: actions/upload-artifact@v4
+        with:
+          name: wrapper-gerado
           path: |
-            reports/super-relatorio.md
-            reports/build.log
-            app/build/outputs/apk/debug/*.apk
+            gradlew
+            gradlew.bat
+            gradle/wrapper/gradle-wrapper.jar
+            gradle/wrapper/gradle-wrapper.properties
           if-no-files-found: ignore
