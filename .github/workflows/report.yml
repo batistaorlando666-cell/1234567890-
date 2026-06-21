@@ -1,0 +1,58 @@
+name: Reporte da Pasta
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Mostrar nome da pasta
+        run: |
+          echo "Nome da pasta do workspace:"
+          echo "$(basename "$GITHUB_WORKSPACE")"
+
+      - name: Gerar relatório
+        run: |
+          {
+            echo "# Relatório do Projeto"
+            echo ""
+            echo "## Pasta raiz"
+            echo "$(basename "$GITHUB_WORKSPACE")"
+            echo ""
+            echo "## Caminho completo"
+            echo "$GITHUB_WORKSPACE"
+            echo ""
+            echo "## Arquivos e pastas no nível principal"
+            ls -la
+            echo ""
+            echo "## Estrutura resumida"
+            find . -maxdepth 2 | sort
+          } > report.txt
+
+      - name: Mostrar relatório no log
+        run: cat report.txt
+
+      - name: Resumo do job
+        run: |
+          {
+            echo "### Relatório gerado"
+            echo ""
+            echo "- Pasta: \`$(basename "$GITHUB_WORKSPACE")\`"
+            echo "- Caminho: \`$GITHUB_WORKSPACE\`"
+            echo "- Relatório salvo em: \`report.txt\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enviar relatório como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-pasta
+          path: report.txt
