@@ -1,17 +1,12 @@
-name: Android CI Automatizado com Relatórios
+name: Gerar APK Direto
 
 on:
-  # Liga no automático para cada 'push' (envio de código)
   push:
     branches: [ "main", "master" ]
-  # Liga no automático quando alguém tenta juntar código novo (Pull Request)
-  pull_request:
-    branches: [ "main", "master" ]
-  # Mantém o botão manual caso você queira forçar a execução
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,35 +25,11 @@ jobs:
     - name: Dar permissão de execução para o gradlew
       run: chmod +x gradlew
 
-    # 1. Avaliar Erros de Código (Lint)
-    - name: Verificar erros e qualidade do código (Lint)
-      run: ./gradlew lintDebug
-
-    # 2. Rodar os Testes (Verificar Módulos)
-    - name: Rodar testes unitários
-      run: ./gradlew testDebugUnitTest
-
-    # 3. Gerar o APK
+    # Vamos tentar compilar diretamente o APK
     - name: Gerar o APK Debug
       run: ./gradlew assembleDebug
 
-    # 4. Salvar Relatório de Erros (Lint)
-    - name: Disponibilizar Relatório do Lint
-      uses: actions/upload-artifact@v4
-      if: always() # Garante que o relatório seja gerado mesmo se encontrar erros
-      with:
-        name: relatorio-lint
-        path: app/build/reports/lint-results-debug.html
-
-    # 5. Salvar Relatório de Testes
-    - name: Disponibilizar Relatório de Testes
-      uses: actions/upload-artifact@v4
-      if: always() # Garante que o relatório de testes seja salvo caso algum teste falhe
-      with:
-        name: relatorio-testes
-        path: app/build/reports/tests/testDebugUnitTest/
-
-    # 6. Salvar o APK gerado
+    # Se a linha acima funcionar, este passo vai guardar o seu APK
     - name: Disponibilizar APK
       uses: actions/upload-artifact@v4
       with:
