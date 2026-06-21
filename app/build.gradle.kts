@@ -25,6 +25,11 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // BLOCO ADICIONADO PARA RESOLVER O ERRO DE ARQUIVOS DUPLICADOS
+    packaging {
+        resources.excludes.add("META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+    }
 }
 
 dependencies {
